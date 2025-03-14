@@ -1,0 +1,26 @@
+# 基础爬虫库
+DrissionPage>=4.0.0b7
+requests>=2.31.0
+
+# 数据处理和分析
+pandas>=2.1.0
+numpy>=1.24.0
+
+# 数据可视化
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Web界面
+gradio>=4.19.0
+Flask>=2.0.0
+
+# 日期时间处理
+python-dateutil>=2.8.2
+
+# HTML解析
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# 其他工具
+tqdm>=4.65.0
+pillow>=10.0.0 
