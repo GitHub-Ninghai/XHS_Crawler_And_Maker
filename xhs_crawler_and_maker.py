@@ -1,6 +1,4 @@
 # 采集工具 gradio前端界面
-
-
 import gradio as gr
 import json
 import os
@@ -9,6 +7,7 @@ from star_xhs import XHSCrawler
 import webbrowser
 from datetime import datetime
 import time
+from deepseek import DeepSeekProcessor
 
 edge_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 if not os.path.exists(edge_path):
@@ -23,6 +22,57 @@ class XHSCrawlerWeb:
         self.keyword = None  # 改为单个关键词
         self.cookie_manager = CookieManager()
         self.crawler = None
+        self.deepseek_processor = None
+
+    def ai_data_process(self, file_path, model, template, custom_prompt):
+        try:
+            # 参数验证
+            if not file_path:
+                return "⚠️ 请先选择数据文件"
+            if not os.path.exists(file_path):
+                return "⚠️ 文件不存在，请重新选择"
+
+            # 模型初始化
+            if model == "DeepSeek":
+                if not self.deepseek_processor:
+                    # 改为从界面输入获取API密钥
+                    api_key = os.getenv("DEEPSEEK_API_KEY")
+                    if not api_key:
+                        return "⚠️ 请先设置DEEPSEEK_API_KEY环境变量"
+
+                    self.deepseek_processor = DeepSeekProcessor(api_key)
+
+                # 构建提示词（优化模板提示）
+                preset_prompts = {
+                    "自动生成摘要": "请用简洁的小红书风格总结以下内容，列出3个使用💡emoji标注的核心要点",
+                    "评论情感分析": "分析以下评论的情感倾向，使用😊/😐/😟表情进行分类，并给出改进建议",
+                    "标题优化建议": "用小红书热门标题风格分析以下标题，提供5个带🔥符号的改进方案",
+                    "内容创意改写": "将以下内容改写成3种不同的小红书风格（种草体、测评体、教程体）",
+                    "小红书文案生成": self.deepseek_processor.system_prompt  # 直接使用系统预设
+                }
+
+                final_prompt = custom_prompt if custom_prompt.strip() else preset_prompts.get(template, "")
+                if not final_prompt:
+                    return "⚠️ 请选择或输入有效的处理指令"
+
+                # 执行处理并保存结果
+                result = self.deepseek_processor.process_data(file_path, final_prompt)
+
+                # 自动保存结果
+                if result:
+                    output_dir = "E:/projects/xhs_maker/data/results"
+                    os.makedirs(output_dir, exist_ok=True)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = os.path.join(output_dir, f"result_{timestamp}.txt")
+                    with open(filename, "w", encoding="utf-8") as f:
+                        f.write(result)
+                    return f"✅ 处理成功！结果已保存至：{filename}\n\n{result}"
+
+                return "生成失败，请检查输入数据"
+            else:
+                return "⚠️ 暂不支持该模型"
+        except Exception as e:
+            return f"处理失败: {str(e)}"
 
     def check_cookie_status(self):
         """检查Cookie状态"""
@@ -194,14 +244,14 @@ class XHSCrawlerWeb:
 
                         with gr.Row():
                             notes_count = gr.Number(
-                                value=20,
+                                value=5,
                                 label="📒 采集笔记数量",
                                 minimum=1,
                                 maximum=100,
                                 elem_classes="numeric-input"
                             )
                             comments_count = gr.Number(
-                                value=20,
+                                value=5,
                                 label="💬 每篇评论数量",
                                 minimum=1,
                                 maximum=100,
@@ -264,79 +314,121 @@ class XHSCrawlerWeb:
                     )
 
                 with gr.Tab("🤖 AI数据二创", id="tab_ai"):
-                    with gr.Group():
-                        gr.Markdown("""
-                        <div style="padding: 16px 0;">
-                            <h3 style="margin: 0 0 12px 0;">🎨 智能二创功能</h3>
-                            <p style="color: #666;">使用大语言模型对采集数据进行智能处理</p>
-                        </div>
-                        """)
+                    # 标题区域
+                    gr.Markdown("""
+                    <div style="padding: 16px 0 8px;">
+                        <h3 style="margin: 0; color: #2d3748;">🎨 智能二创功能</h3>
+                        <p style="color: #718096; font-size:0.9em">使用大语言模型对采集数据进行智能处理</p>
+                    </div>
+                    """)
 
-                        with gr.Row():
+                    with gr.Group():
+                        # 输入区域
+                        with gr.Row(equal_height=False):
+                            # 左侧控制面板
                             with gr.Column(scale=2):
+                                # API密钥输入
+                                api_key_input = gr.Textbox(
+                                    label="🔑 DeepSeek API密钥",
+                                    type="password",
+                                    placeholder="请输入API密钥",
+                                    info="从DeepSeek控制台获取",
+                                    interactive=True
+                                )
+
+                                # 文件选择
                                 file_input = gr.File(
                                     label="📁 选择数据文件",
-                                    file_types=[".json"],
-                                    type="filepath"
-                                )
-                                model_selector = gr.Dropdown(
-                                    label="🛠️ 选择模型",
-                                    choices=["GPT-4o", "Claude-3", "ERNIE-4.0"],
-                                    value="GPT-4o"
+                                    file_types=[".csv"],
+                                    type="filepath",
+                                    height=80
                                 )
 
-                            with gr.Column(scale=3):
-                                with gr.Tabs():
-                                    with gr.Tab("📝 预设模板"):
+                                # 模型选择
+                                model_selector = gr.Dropdown(
+                                    label="🛠️ 选择模型",
+                                    choices=["GPT-4o", "Claude-3", "ERNIE-4.0", "DeepSeek"],
+                                    value="DeepSeek",
+                                    interactive=True
+                                )
+
+                                # 模板选择标签页
+                                with gr.Tabs(selected=0) as template_tabs:
+                                    with gr.Tab("📝 预设模板", id="preset"):
                                         template_select = gr.Dropdown(
                                             label="选择处理模板",
                                             choices=[
                                                 "自动生成摘要",
                                                 "评论情感分析",
                                                 "标题优化建议",
-                                                "内容创意改写"
+                                                "内容创意改写",
+                                                "小红书文案生成"
                                             ],
+                                            value="小红书文案生成",
                                             interactive=True
                                         )
-                                    with gr.Tab("✨ 自定义指令"):
+
+                                    with gr.Tab("✨ 自定义指令", id="custom"):
                                         custom_prompt = gr.Textbox(
                                             label="输入自定义指令",
                                             placeholder="例：请分析这些笔记的主要内容并生成5个热门话题",
                                             lines=4,
-                                            max_lines=8
+                                            max_lines=8,
+                                            show_label=True
                                         )
 
-                        with gr.Row():
+                            # 右侧输出区域
+                            with gr.Column(scale=3):
+                                output_area = gr.Textbox(
+                                    label="📋 处理结果",
+                                    interactive=True,
+                                    lines=15,
+                                    max_lines=20,
+                                    elem_classes="result-box"
+                                )
+                                with gr.Row():
+                                    gr.Button(
+                                        "📋 复制结果",
+                                        size="sm"
+                                    ).click(
+                                        lambda x: x,
+                                        inputs=output_area
+                                    )
+                                    gr.Button(
+                                        "📂 打开结果目录",
+                                        size="sm"
+                                    ).click(
+                                        lambda: os.startfile("./data/results"),
+                                        queue=False
+                                    )
+
+                        # 操作按钮
+                        with gr.Row(variant="panel"):
                             process_btn = gr.Button(
                                 "🚀 开始智能处理",
                                 variant="primary",
-                                scale=2
+                                scale=2,
+                                size="sm"
                             )
                             stop_ai_btn = gr.Button(
                                 "⏹️ 停止处理",
                                 variant="secondary",
-                                scale=1
+                                scale=1,
+                                size="sm"
                             )
 
-                        with gr.Row():
-                            output_area = gr.Textbox(
-                                label="📋 处理结果",
-                                interactive=True,
-                                lines=8,
-                                max_lines=15,
-                                elem_classes="result-box"
-                            )
-
-                        gr.Markdown("""
-                        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <h4 style="margin: 0 0 10px 0;">💡 使用提示：</h4>
-                            <ul style="margin: 0; color: #666;">
-                                <li>支持JSON格式的采集数据文件</li>
-                                <li>首次使用建议先尝试预设模板</li>
-                                <li>自定义指令请使用明确的要求格式</li>
-                            </ul>
-                        </div>
-                        """)
+                    # 使用提示
+                    gr.Markdown("""
+                    <div style="margin:20px 0; padding:15px; background:#f8fafc; border-radius:8px;">
+                        <h4 style="margin:0 0 12px 0; color:#2d3748; font-size:0.95em">💡 使用提示：</h4>
+                        <ul style="margin:0; color:#4a5568; font-size:0.9em">
+                            <li>首次使用需先输入DeepSeek API密钥</li>
+                            <li>支持CSV格式的采集数据文件（建议文件小于10MB）</li>
+                            <li>自定义指令请使用明确的要求格式，如："请分析...并生成..."</li>
+                            <li>处理结果会自动保存在/data/results目录</li>
+                        </ul>
+                    </div>
+                    """)
 
                 with gr.Tab("📚 使用指南", id="tab_help"):
                     gr.Markdown("""
@@ -361,6 +453,21 @@ class XHSCrawlerWeb:
                         </div>
                     </div>
                     """)
+            # 事件绑定
+            api_key_input.change(
+                lambda x: os.environ.update({"DEEPSEEK_API_KEY": x}),
+                inputs=api_key_input,
+                queue=False
+            )
+
+            process_btn.click(
+                lambda: gr.Info("开始处理，请稍候..."),
+                queue=False
+            ).then(
+                self.ai_data_process,
+                inputs=[file_input, model_selector, template_select, custom_prompt],
+                outputs=output_area
+            )
 
             interface.css = """
             .status-box {
