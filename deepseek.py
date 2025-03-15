@@ -137,7 +137,7 @@ def save_and_show_result(result, output_dir="./data/results"):
 
 # 使用示例
 if __name__ == "__main__":
-    processor = DeepSeekProcessor(api_key="sk-a5457b7547314c93b76801027067cd49")
+    processor = DeepSeekProcessor(api_key="sk-xxx")
 
     # 执行处理
     result = processor.process_data(
