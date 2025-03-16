@@ -27,7 +27,7 @@ class NotesCollector:
                 # 遍历当前可见的笔记项
                 for i, note in enumerate(note_items):
                     if self.collected_count >= 20:
-                        print("已达到20篇笔记上限")
+                        print("已达到笔记上限")
                         return True
                         
                     try:

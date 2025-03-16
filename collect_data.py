@@ -10,9 +10,13 @@ class DataCollector:
         # 确保data目录存在
         if not os.path.exists('data/notes'):
             os.makedirs('data/notes')
-        
-        # 使用固定的CSV文件名
-        self.csv_file = 'data/notes/xhs_python_notes.csv'
+        # 获取当前日期
+        now = datetime.now()
+        formatted_date = now.strftime('%Y%m%d')
+
+
+        self.csv_file = f'data/notes/xhs_python_notes_{formatted_date}.csv'
+
         
         # 定义CSV表头
         self.headers = [

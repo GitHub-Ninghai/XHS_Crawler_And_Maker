@@ -10,9 +10,14 @@ class CommentCollector:
         # 确保data/user目录存在
         if not os.path.exists('data/user'):
             os.makedirs('data/user')
-        
-        # 使用固定的CSV文件名
-        self.csv_file = 'data/user/xhs_comments.csv'
+
+        # 获取当前日期
+        now = datetime.now()
+        formatted_date = now.strftime('%Y%m%d')
+
+
+        self.csv_file = f'data/user/xhs_comment_{formatted_date}.csv'
+
         
         # 定义CSV表头
         self.headers = [
